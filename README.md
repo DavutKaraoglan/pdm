@@ -1,9 +1,9 @@
 # pdm
 
-![platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android-1a1a1a?style=flat-square)
-![python](https://img.shields.io/badge/python-3.9%2B-1a1a1a?style=flat-square)
-![dependencies](https://img.shields.io/badge/python%20deps-stdlib%20only-1a1a1a?style=flat-square)
-![built on](https://img.shields.io/badge/built%20on-aria2c%20%2B%20yt--dlp-1a1a1a?style=flat-square)
+![platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android-3ddc84?style=flat-square&logo=android&logoColor=white)
+![python](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
+![dependencies](https://img.shields.io/badge/python%20deps-stdlib%20only-brightgreen?style=flat-square)
+![built on](https://img.shields.io/badge/built%20on-aria2c%20%2B%20yt--dlp-orange?style=flat-square)
 
 Package Download Manager for Termux. One link in, the files on your phone.
 
