@@ -33,21 +33,82 @@ not raw speed, is the point of this tool.
 
 ## Install
 
+Inside [Termux](https://f-droid.org/packages/com.termux/) (the F-Droid build;
+the Play Store one is too old):
+
 ```sh
-git clone https://github.com/<you>/pdm
+pkg install -y git
+git clone https://github.com/DavutKaraoglan/pdm
 cd pdm
 sh install.sh
 ```
 
-The installer pulls `aria2`, `ffmpeg`, `yt-dlp`, a JS runtime and `termux-api`,
-then links `pdm` into `$PREFIX/bin`. Check the result any time:
+`install.sh` installs `aria2`, `ffmpeg`, `yt-dlp`, a JS runtime and
+`termux-api`, then symlinks `pdm` into `$PREFIX/bin`, so the command works from
+any folder. It skips whatever is already present, so it is safe to re-run.
+
+Give Termux access to your storage once, otherwise downloads stay inside the
+Termux home:
+
+```sh
+termux-setup-storage
+```
+
+Check the result any time:
 
 ```sh
 pdm doctor
 ```
 
-Notifications additionally need the **Termux:API** app from F-Droid; the
-`termux-api` package alone is not enough.
+```
+pdm 1.0
+python   3.13.13
+aria2c   aria2 version 1.37.0
+yt-dlp   2026.08.19
+ffmpeg   ffmpeg version 8.1.2
+js       node (/data/data/com.termux/files/usr/bin/node)
+wakelock termux-wake-lock (downloads survive the screen going off)
+notify   termux-api (needs the Termux:API app too)
+folder   /storage/emulated/0/Download  (writable)
+queue    0 entries
+```
+
+Anything marked `MISSING` prints the command that fixes it.
+
+### Manual install
+
+If you would rather not run the script:
+
+```sh
+pkg install -y aria2 ffmpeg python nodejs-lts termux-api
+pip install -U yt-dlp
+chmod +x pdm.py
+ln -sf "$PWD/pdm.py" "$PREFIX/bin/pdm"
+```
+
+`nodejs-lts` is only needed for YouTube, `termux-api` only for notifications.
+
+### Notifications
+
+`pdm get -N` also needs the **Termux:API** app from
+[F-Droid](https://f-droid.org/packages/com.termux.api/); the `termux-api`
+package on its own is just the CLI half and the notification will not appear.
+
+### Update
+
+```sh
+cd pdm && git pull
+pip install -U yt-dlp
+```
+
+The symlink keeps pointing at the same file, so nothing else has to be redone.
+
+### Uninstall
+
+```sh
+rm "$PREFIX/bin/pdm"
+rm -rf ~/.config/pdm ~/.local/share/pdm
+```
 
 ## Usage
 
@@ -128,8 +189,5 @@ paths. Without an `out` setting, downloads land in `/storage/emulated/0/Download
   yt-dlp's own downloader automatically.
 - Names taken from repository listings are checked before they reach aria2c, so
   a `../` or a newline in a listed file name cannot write outside the folder.
-
-## Requirements
-
-Termux, Python 3.9+, `aria2`, `yt-dlp`, `ffmpeg`. Optional: `nodejs-lts` for
-YouTube, `termux-api` plus the Termux:API app for notifications.
+- `pdm.py` is the whole program: standard library only, Python 3.9 or newer.
+  Nothing is imported that Termux does not already ship.
