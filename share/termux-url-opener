@@ -8,10 +8,13 @@ url="$1"
 if [ -z "$url" ] && [ ! -t 0 ]; then
 	read -r url || true
 fi
-url=$(printf '%s' "$url" | tr -d '\r' | awk '{print $1}')
+# Sharing a text selection sends the whole paragraph, so pick the link out of it.
+url=$(printf '%s' "$url" | tr -d '\r' |
+	grep -oE '(https?://|magnet:\?)[^[:space:]"<>]+' | head -1 || true)
 
 if [ -z "$url" ]; then
-	echo "no link received"
+	echo "no link in what was shared"
+	echo "use the share button itself, not a text selection"
 	exit 1
 fi
 
