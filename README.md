@@ -1,5 +1,10 @@
 # pdm
 
+![platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android-1a1a1a?style=flat-square)
+![python](https://img.shields.io/badge/python-3.9%2B-1a1a1a?style=flat-square)
+![dependencies](https://img.shields.io/badge/python%20deps-stdlib%20only-1a1a1a?style=flat-square)
+![built on](https://img.shields.io/badge/built%20on-aria2c%20%2B%20yt--dlp-1a1a1a?style=flat-square)
+
 Package Download Manager for Termux. One link in, the files on your phone.
 
 `pdm` is a single stdlib-only Python file that drives `aria2c` and `yt-dlp`. It
