@@ -154,6 +154,16 @@ continue from the part file rather than starting over. Files left behind by a
 download pdm has no record of are listed too, since re-sending that link
 finishes them the same way.
 
+If you would rather have the space back than finish them:
+
+```sh
+pdm clean                      # list the half finished files and their size
+pdm clean -y                   # delete them
+```
+
+Anything written to in the last 30 seconds is skipped, so a running download
+cannot be cleaned out from under itself.
+
 ### Queue
 
 ```sh

@@ -1030,6 +1030,41 @@ def cmd_resume(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def cmd_clean(args: argparse.Namespace) -> int:
+    folder = out_dir(load_config(), getattr(args, "out", None))
+    files: list[Path] = []
+    for path in leftovers(folder):
+        control = path.with_name(path.name + ".aria2")
+        # A file still being written belongs to a download that is running.
+        if time.time() - path.stat().st_mtime < 30:
+            print(f"  skipped, still being written: {short(path.name, 44)}")
+            continue
+        files.append(path)
+        if control.exists():
+            files.append(control)
+    if not files:
+        print("nothing to clean")
+        return 0
+    total = sum(p.stat().st_blocks * 512 for p in files if p.exists())
+    for path in files:
+        print(f"  {short(path.name, 52)}")
+    print(f"{len(files)} files, {human(total)}")
+    if not args.yes:
+        print("nothing deleted, run again with -y")
+        return 0
+    removed = 0
+    for path in files:
+        try:
+            path.unlink()
+            removed += 1
+        except OSError as exc:
+            print(f"could not delete {path.name}: {exc}")
+    # Their records are worthless once the part files are gone.
+    save_active([i for i in load_active() if alive(i.get("pid", 0))])
+    print(f"{removed} files deleted, {human(total)} freed")
+    return 0
+
+
 def cmd_formats(args: argparse.Namespace) -> int:
     need(["yt-dlp"])
     return subprocess.call(["yt-dlp", "-F", "--no-playlist", args.url])
@@ -1325,6 +1360,11 @@ def build_parser() -> argparse.ArgumentParser:
     resume.add_argument("-N", "--notify", action="store_true", help="notification progress")
     resume.add_argument("--quiet", action="store_true")
     resume.set_defaults(func=cmd_resume)
+
+    clean = subs.add_parser("clean", help="delete half finished files")
+    clean.add_argument("-y", "--yes", action="store_true", help="actually delete them")
+    clean.add_argument("-o", "--out", metavar="DIR", help="folder to look in")
+    clean.set_defaults(func=cmd_clean)
 
     rm = subs.add_parser("rm", help="remove from the queue")
     rm.add_argument("ids", nargs="+", metavar="ID")
