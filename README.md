@@ -166,9 +166,10 @@ https://youtu.be/jNQXAC9IVRw
 choice [1]:
 ```
 
-Enter picks video. The first three detach and report through a notification, so
-the session can be closed straight away; `4` only drops the link in the queue
-for a later `pdm run`.
+Enter picks video. The download runs in that session so you can watch the bar,
+and `-N` mirrors it to the notification shade; Termux keeps the session alive
+while you go back to the browser. `4` only drops the link in the queue for a
+later `pdm run`.
 
 ### Settings
 

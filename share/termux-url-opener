@@ -32,8 +32,10 @@ case "$choice" in
 	*) set -- get -M ;;
 esac
 
-# `add` only writes to the queue, so there is nothing to detach or notify.
+# `add` only writes to the queue, so there is nothing to notify about.
 if [ "$1" = add ]; then
 	exec pdm "$@" "$url"
 fi
-exec pdm "$@" -b -N "$url"
+# Foreground, so the session that just opened actually shows the bar. Termux
+# keeps the session alive in the background, and -N mirrors it to the shade.
+exec pdm "$@" -N "$url"
