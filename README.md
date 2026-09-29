@@ -129,6 +129,31 @@ pdm get -i links.txt           # one link per line
 pdm formats <link>             # list what the site offers
 ```
 
+### Running downloads
+
+```sh
+pdm status                     # what is downloading, and what stopped halfway
+pdm stop 001                   # stop one, or --all
+pdm resume                     # continue everything that was interrupted
+pdm status --clear             # forget the stopped entries instead
+```
+
+Every download is recorded while it runs, so a kill, a crash or a closed
+terminal leaves something to go back to:
+
+```
+#001  stopped  background  pid 28966  since 19:59:27
+      https://huggingface.co/hf-internal-testing/tiny-random-gpt2
+      (4/10) model.safetensors
+
+stopped entries can be picked up with: pdm resume
+```
+
+`resume` re-runs the same link with the same options; aria2c and yt-dlp both
+continue from the part file rather than starting over. Files left behind by a
+download pdm has no record of are listed too, since re-sending that link
+finishes them the same way.
+
 ### Queue
 
 ```sh

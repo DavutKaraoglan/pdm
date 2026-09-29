@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -262,6 +263,71 @@ def save_queue(items: list) -> None:
     tmp = QUEUE_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(items, indent=2, ensure_ascii=False) + "\n")
     tmp.replace(QUEUE_PATH)
+
+
+ACTIVE_PATH = QUEUE_PATH.parent / "active.json"
+STATE_LOCK = threading.Lock()
+
+
+def load_active() -> list:
+    if not ACTIVE_PATH.exists():
+        return []
+    try:
+        return json.loads(ACTIVE_PATH.read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_active(items: list) -> None:
+    ACTIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ACTIVE_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(items, indent=2, ensure_ascii=False) + "\n")
+    tmp.replace(ACTIVE_PATH)
+
+
+def active_start(url: str, opts: dict) -> str:
+    """Record a download so it can be found again after the process is gone."""
+    log = os.environ.get("PDM_LOG", "")
+    with STATE_LOCK:
+        items = load_active()
+        entry = {
+            "id": new_id(items),
+            "url": url,
+            "opts": opts,
+            "pid": os.getpid(),
+            "log": log,
+            "detached": bool(log),
+            "started": datetime.now().isoformat(timespec="seconds"),
+        }
+        items.append(entry)
+        save_active(items)
+    return entry["id"]
+
+
+def active_claim(entry_id: str) -> None:
+    """Take an old record over, so stop still reaches the download."""
+    log = os.environ.get("PDM_LOG", "")
+    with STATE_LOCK:
+        items = load_active()
+        for item in items:
+            if item.get("id") == entry_id:
+                item.update(pid=os.getpid(), log=log, detached=bool(log))
+        save_active(items)
+
+
+def active_end(entry_id: str) -> None:
+    with STATE_LOCK:
+        save_active([i for i in load_active() if i.get("id") != entry_id])
+
+
+def alive(pid: int) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
 
 
 def new_id(items: list) -> str:
@@ -803,7 +869,8 @@ def detach(args: argparse.Namespace) -> int:
     log = LOG_DIR / f"{datetime.now():%Y%m%d-%H%M%S}.log"
     cmd = [sys.executable, str(Path(__file__).resolve())]
     cmd += [a for a in sys.argv[1:] if a not in ("-b", "--background")]
-    env = dict(os.environ, PDM_NOTIFY="1")  # the terminal is gone, so notify instead
+    # The terminal is gone, so notify instead; the child records the log itself.
+    env = dict(os.environ, PDM_NOTIFY="1", PDM_LOG=str(log))
     with log.open("wb") as handle:
         proc = subprocess.Popen(cmd, stdout=handle, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, start_new_session=True, env=env)
@@ -824,7 +891,11 @@ def cmd_get(args: argparse.Namespace) -> int:
     total = len(urls)
     for index, url in enumerate(urls, 1):
         prefix = f"[{index}/{total}] " if total > 1 else ""
+        # The record outlives a crash or a kill, which is what resume works from.
+        entry = "" if opts.get("dry_run") else active_start(url, opts)
         if download(url, cfg, opts, screen, prefix):
+            if entry:
+                active_end(entry)
             if not opts.get("dry_run"):
                 screen.note(f"{prefix}done")
         else:
@@ -832,6 +903,130 @@ def cmd_get(args: argparse.Namespace) -> int:
     if screen.notify and not opts.get("dry_run"):
         notify(f"{total - failed}/{total} done -> {out_dir(cfg, opts.get('out'))}"
                if not failed else f"{failed}/{total} failed")
+    return 1 if failed else 0
+
+
+def last_line(path: str) -> str:
+    """The tail of a detached job's log is its most recent progress frame."""
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - 4096))
+            blob = handle.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+    parts = [p.strip() for p in re.split(r"[\r\n]", blob) if p.strip()]
+    return parts[-1] if parts else ""
+
+
+def leftovers(folder: Path) -> list[Path]:
+    """Half written files from a download pdm has no record of."""
+    found = set()
+    for pattern in ("*.part", "*.aria2", "*/*.part", "*/*.aria2"):
+        # A .part and its .part.aria2 control file are the same download.
+        found |= {p.with_suffix("") if p.suffix == ".aria2" else p for p in folder.glob(pattern)}
+    return sorted(found)[:10]
+
+
+def human(size: float) -> str:
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if size < 1024 or unit == "GiB":
+            return f"{size:.0f}{unit}" if unit == "B" else f"{size:.1f}{unit}"
+        size /= 1024
+    return ""
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    items = load_active()
+    if args.clear:
+        keep = [i for i in items if alive(i.get("pid", 0))]
+        save_active(keep)
+        print(f"{len(items) - len(keep)} finished entries forgotten")
+        return 0
+    if not items:
+        print("nothing running")
+        show_leftovers()
+        return 0
+    for item in items:
+        running = alive(item.get("pid", 0))
+        state = "running" if running else "stopped"
+        where = "background" if item.get("detached") else "session"
+        print(f"#{item['id']}  {state:<8} {where}  pid {item.get('pid', 0)}  "
+              f"since {item.get('started', '?')[11:]}")
+        print(f"      {item.get('url', '')}")
+        tail = last_line(item.get("log", "")) if item.get("log") else ""
+        if tail:
+            print(f"      {tail}")
+    if any(not alive(i.get("pid", 0)) for i in items):
+        print("\nstopped entries can be picked up with: pdm resume")
+    show_leftovers()
+    return 0
+
+
+def show_leftovers() -> None:
+    folder = out_dir(load_config())
+    files = leftovers(folder)
+    if not files:
+        return
+    print(f"\nhalf finished, with no record of the link ({folder}):")
+    for path in files:
+        # Blocks, not st_size: aria2 leaves a sparse file the full size of the download.
+        size = path.stat().st_blocks * 512 if path.exists() else 0
+        print(f"  {short(path.name, 44)}  {human(size)}")
+    print("  share or paste the link again, it continues from here")
+
+
+def pick(items: list, ids: list) -> list:
+    wanted = {i.lstrip("#").lstrip("0") or "0" for i in ids}
+    return [i for i in items if i.get("id", "").lstrip("0") in wanted]
+
+
+def cmd_stop(args: argparse.Namespace) -> int:
+    items = load_active()
+    targets = items if args.all else pick(items, args.ids)
+    if not targets:
+        print("no matching download")
+        return 1
+    stopped = 0
+    for item in targets:
+        pid = item.get("pid", 0)
+        if not alive(pid):
+            continue
+        try:
+            if item.get("detached"):
+                # Detached jobs own their session, so the whole group can go.
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            else:
+                os.kill(pid, signal.SIGTERM)
+            stopped += 1
+        except OSError as exc:
+            print(f"#{item['id']}: could not stop ({exc})")
+    # The records stay behind on purpose, that is what resume picks up.
+    print(f"{stopped} stopped, continue with: pdm resume")
+    return 0
+
+
+def cmd_resume(args: argparse.Namespace) -> int:
+    cfg = apply_overrides(load_config(), args)
+    items = load_active()
+    targets = pick(items, args.ids) if args.ids else items
+    targets = [i for i in targets if not alive(i.get("pid", 0))]
+    if not targets:
+        print("nothing to resume")
+        return 0
+    screen = Screen(quiet=args.quiet, notify=args.notify)
+    failed = 0
+    for item in targets:
+        prefix = f"#{item['id']} "
+        screen.note(f"{prefix}{item.get('url', '')}")
+        active_claim(item["id"])
+        opts = dict(item.get("opts") or {})
+        # aria2c and yt-dlp both continue from the part file on their own.
+        if download(item.get("url", ""), cfg, opts, screen, prefix):
+            active_end(item["id"])
+            screen.note(f"{prefix}done")
+        else:
+            failed += 1
     return 1 if failed else 0
 
 
@@ -1049,6 +1244,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     target = out_dir(cfg)
     print(f"folder   {target}  ({'writable' if os.access(target, os.W_OK) else 'NOT WRITABLE'})")
     print(f"queue    {len(load_queue())} entries  ({QUEUE_PATH})")
+    items = load_active()
+    if items:
+        running = sum(1 for i in items if alive(i.get("pid", 0)))
+        print(f"active   {running} running, {len(items) - running} stopped  (pdm status)")
     return 1 if missing else 0
 
 
@@ -1109,6 +1308,24 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument("--quiet", action="store_true")
     run_cmd.set_defaults(func=cmd_run)
 
+    status = subs.add_parser("status", help="show running downloads")
+    status.add_argument("--clear", action="store_true", help="forget stopped entries")
+    status.set_defaults(func=cmd_status)
+
+    stop = subs.add_parser("stop", help="stop a running download")
+    stop.add_argument("ids", nargs="*", metavar="ID")
+    stop.add_argument("--all", action="store_true", help="stop everything")
+    stop.set_defaults(func=cmd_stop)
+
+    resume = subs.add_parser("resume", help="continue what was interrupted")
+    resume.add_argument("ids", nargs="*", metavar="ID")
+    resume.add_argument("-x", "--conns", type=int, metavar="N", help="number of connections")
+    resume.add_argument("--limit", metavar="RATE", help="speed limit")
+    resume.add_argument("-M", "--max-speed", action="store_true", help="no rate limit")
+    resume.add_argument("-N", "--notify", action="store_true", help="notification progress")
+    resume.add_argument("--quiet", action="store_true")
+    resume.set_defaults(func=cmd_resume)
+
     rm = subs.add_parser("rm", help="remove from the queue")
     rm.add_argument("ids", nargs="+", metavar="ID")
     rm.set_defaults(func=cmd_rm)
@@ -1140,7 +1357,8 @@ def main(argv: list[str]) -> int:
     if not getattr(args, "func", None):
         parser.print_help()
         return 0
-    downloading = args.func in (cmd_get, cmd_run) and not getattr(args, "background", False)
+    downloading = (args.func in (cmd_get, cmd_run, cmd_resume)
+                   and not getattr(args, "background", False))
     if downloading:
         wake_lock(True)
     try:
