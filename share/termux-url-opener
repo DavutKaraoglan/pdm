@@ -1,0 +1,36 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Runs when a link is shared to Termux from any app.
+# Install: ln -sf <repo>/share/termux-url-opener ~/bin/termux-url-opener
+set -e
+
+url="$1"
+# Termux passes the link as an argument, older builds send it on stdin.
+if [ -z "$url" ] && [ ! -t 0 ]; then
+	read -r url || true
+fi
+url=$(printf '%s' "$url" | tr -d '\r' | awk '{print $1}')
+
+if [ -z "$url" ]; then
+	echo "no link received"
+	exit 1
+fi
+
+printf '%s\n\n' "$url"
+printf '1 video   2 audio   3 1080p   4 queue   5 cancel\n'
+printf 'choice [1]: '
+choice=1
+read -r answer 2>/dev/null </dev/tty && choice=${answer:-1}
+
+case "$choice" in
+	2) set -- get -M -a ;;
+	3) set -- get -M -q 1080 ;;
+	4) set -- add ;;
+	5) echo "cancelled"; exit 0 ;;
+	*) set -- get -M ;;
+esac
+
+# `add` only writes to the queue, so there is nothing to detach or notify.
+if [ "$1" = add ]; then
+	exec pdm "$@" "$url"
+fi
+exec pdm "$@" -b -N "$url"

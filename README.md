@@ -153,6 +153,23 @@ pdm get -N <link>              # progress in the notification area
 terminal left to print to. Either way `pdm` holds a wake lock while downloading,
 so the transfer keeps going when the screen goes off.
 
+### Share menu
+
+`install.sh` links `share/termux-url-opener` into `~/bin`, which is what Termux
+runs when a link is shared to it. Hit **share -> Termux** in Chrome, YouTube or
+anywhere else and a session opens with the link ready:
+
+```
+https://youtu.be/jNQXAC9IVRw
+
+1 video   2 audio   3 1080p   4 queue   5 cancel
+choice [1]:
+```
+
+Enter picks video. The first three detach and report through a notification, so
+the session can be closed straight away; `4` only drops the link in the queue
+for a later `pdm run`.
+
 ### Settings
 
 ```sh

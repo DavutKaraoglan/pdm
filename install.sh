@@ -49,6 +49,17 @@ chmod +x "$DIR/pdm.py"
 ln -sf "$DIR/pdm.py" "$BIN/pdm"
 echo "$BIN/pdm -> $DIR/pdm.py"
 
+# Termux runs ~/bin/termux-url-opener when a link is shared to it.
+echo "== share menu"
+if [ -e "$HOME/bin/termux-url-opener" ] && [ ! -L "$HOME/bin/termux-url-opener" ]; then
+	echo "~/bin/termux-url-opener already exists, left alone"
+else
+	mkdir -p "$HOME/bin"
+	chmod +x "$DIR/share/termux-url-opener"
+	ln -sf "$DIR/share/termux-url-opener" "$HOME/bin/termux-url-opener"
+	echo "share a link to Termux to download it"
+fi
+
 echo
 "$BIN/pdm" doctor
 echo
