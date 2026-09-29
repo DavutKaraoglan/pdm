@@ -4,6 +4,7 @@
 ![python](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![dependencies](https://img.shields.io/badge/python%20deps-stdlib%20only-brightgreen?style=flat-square)
 ![built on](https://img.shields.io/badge/built%20on-aria2c%20%2B%20yt--dlp-orange?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
 Package Download Manager for Termux. One link in, the files on your phone.
 
@@ -196,3 +197,8 @@ paths. Without an `out` setting, downloads land in `/storage/emulated/0/Download
   a `../` or a newline in a listed file name cannot write outside the folder.
 - `pdm.py` is the whole program: standard library only, Python 3.9 or newer.
   Nothing is imported that Termux does not already ship.
+
+## License
+
+MIT, see [LICENSE](LICENSE). `aria2c`, `yt-dlp` and `ffmpeg` are separate
+projects under their own licenses.
