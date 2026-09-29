@@ -923,8 +923,11 @@ def leftovers(folder: Path) -> list[Path]:
     """Half written files from a download pdm has no record of."""
     found = set()
     for pattern in ("*.part", "*.aria2", "*/*.part", "*/*.aria2"):
-        # A .part and its .part.aria2 control file are the same download.
-        found |= {p.with_suffix("") if p.suffix == ".aria2" else p for p in folder.glob(pattern)}
+        for path in folder.glob(pattern):
+            # A .part and its .part.aria2 are one download, but the control file
+            # also outlives a part file deleted by hand.
+            target = path.with_suffix("") if path.suffix == ".aria2" else path
+            found.add(target if target.exists() else path)
     return sorted(found)[:10]
 
 
@@ -1034,6 +1037,8 @@ def cmd_clean(args: argparse.Namespace) -> int:
     folder = out_dir(load_config(), getattr(args, "out", None))
     files: list[Path] = []
     for path in leftovers(folder):
+        if not path.exists():
+            continue
         control = path.with_name(path.name + ".aria2")
         # A file still being written belongs to a download that is running.
         if time.time() - path.stat().st_mtime < 30:
