@@ -6,19 +6,12 @@
 ![built on](https://img.shields.io/badge/built%20on-aria2c%20%2B%20yt--dlp-orange?style=flat)
 ![license](https://img.shields.io/badge/license-MIT-blue?style=flat)
 
-Package Download Manager for Termux. One link in, the files on your phone.
+Package Download Manager for Termux.
 
 `pdm` is a single stdlib-only Python file that drives `aria2c` and `yt-dlp`. It
 decides which of the two a link needs, expands repository pages into their file
-lists, and prints one progress bar that fits a phone terminal.
+lists.
 
-```
-$ pdm get -M https://huggingface.co/hf-internal-testing/tiny-random-gpt2
-10 files found -> /storage/emulated/0/Download/tiny-random-gpt2
-max speed: 4 files in parallel
-total [#########-----]  64%  6/10 files
-1[####--] 2[##----] 3[#####-] 4[------] 1.2MiB/s
-```
 
 ## Why
 
@@ -38,9 +31,6 @@ actually have:
 not raw speed, is the point of this tool.
 
 ## Install
-
-Inside [Termux](https://f-droid.org/packages/com.termux/) (the F-Droid build;
-the Play Store one is too old):
 
 ```sh
 pkg install -y git
@@ -78,21 +68,6 @@ notify   termux-api (needs the Termux:API app too)
 folder   /storage/emulated/0/Download  (writable)
 queue    0 entries
 ```
-
-Anything marked `MISSING` prints the command that fixes it.
-
-### Manual install
-
-If you would rather not run the script:
-
-```sh
-pkg install -y aria2 ffmpeg python nodejs-lts termux-api
-pip install -U yt-dlp
-chmod +x pdm.py
-ln -sf "$PWD/pdm.py" "$PREFIX/bin/pdm"
-```
-
-`nodejs-lts` is only needed for YouTube, `termux-api` only for notifications.
 
 ### Notifications
 
