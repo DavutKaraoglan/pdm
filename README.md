@@ -1,6 +1,6 @@
 # pdm
 
-![platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android-3ddc84?style=flat&logo=android&logoColor=white)
+![platform](https://img.shields.io/badge/platform-Android%20-3ddc84?style=flat&logo=android&logoColor=white)
 ![python](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat&logo=python&logoColor=white)
 ![dependencies](https://img.shields.io/badge/python%20deps-stdlib%20only-brightgreen?style=flat)
 ![built on](https://img.shields.io/badge/built%20on-aria2c%20%2B%20yt--dlp-orange?style=flat)
